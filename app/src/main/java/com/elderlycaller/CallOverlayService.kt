@@ -100,10 +100,18 @@ class CallOverlayService : Service() {
             return START_NOT_STICKY
         }
 
-        if (Settings.canDrawOverlays(this)) showOverlay(name, image)
-
         registerCallListener()
         placeCall(phone)
+
+        // Delay overlay until AFTER the dialer's in-call window has been added.
+        // Both windows are TYPE_APPLICATION_OVERLAY; whichever is added last sits
+        // on top. 1 s is enough for the dialer activity to fully initialise.
+        if (Settings.canDrawOverlays(this)) {
+            scope.launch {
+                delay(1_000)
+                if (!callEnded) showOverlay(name, image)
+            }
+        }
 
         return START_NOT_STICKY
     }
