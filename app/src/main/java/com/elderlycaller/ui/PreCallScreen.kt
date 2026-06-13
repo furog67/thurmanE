@@ -1,7 +1,6 @@
 package com.elderlycaller.ui
 
 import android.Manifest
-import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -24,7 +23,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.elderlycaller.CallOverlayService
+import com.elderlycaller.CallingActivity
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.allPermissionsGranted
@@ -54,7 +53,7 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            // Large contact photo — tapping it starts the call
+            // Large contact photo — tapping starts the call
             Box(
                 modifier = Modifier
                     .size(280.dp)
@@ -62,13 +61,14 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            // Navigate back to tile grid FIRST so it sits under the overlay
+                            // CallingActivity takes over the screen; navigating
+                            // back here first ensures the tile grid is underneath.
                             onBack()
-                            CallOverlayService.start(
-                                context = context,
-                                phoneNumber = tile.phoneNumber,
-                                callerName = tile.label,
-                                callerImage = tile.imagePath
+                            CallingActivity.start(
+                                context  = context,
+                                phone    = tile.phoneNumber,
+                                name     = tile.label,
+                                image    = tile.imagePath
                             )
                         } else {
                             callPermissions.launchMultiplePermissionRequest()
@@ -102,18 +102,6 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
-
-            // Warn if overlay permission is missing (admin needs to grant it)
-            if (!Settings.canDrawOverlays(context)) {
-                Spacer(modifier = Modifier.height(24.dp))
-                Text(
-                    text = "⚠ Admin: enable \"Display over other apps\" for best experience",
-                    fontSize = 13.sp,
-                    color = Color(0xFFFFCC02),
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.padding(horizontal = 32.dp)
-                )
-            }
         }
 
         // Back arrow — lets user cancel without calling
