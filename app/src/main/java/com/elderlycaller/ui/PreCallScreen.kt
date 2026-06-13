@@ -1,12 +1,7 @@
 package com.elderlycaller.ui
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.media.AudioManager
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
+import android.provider.Settings
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -29,16 +24,24 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.elderlycaller.CallOverlayService
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.allPermissionsGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
 fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
     val context = LocalContext.current
-    val callPermission = rememberPermissionState(Manifest.permission.CALL_PHONE)
+
+    val callPermissions = rememberMultiplePermissionsState(
+        listOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.ANSWER_PHONE_CALLS,
+        )
+    )
 
     Box(
         modifier = Modifier
@@ -51,18 +54,24 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            // Large circular contact photo — tap this to call
+            // Large contact photo — tapping it starts the call
             Box(
                 modifier = Modifier
                     .size(280.dp)
                     .clip(CircleShape)
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
-                        if (callPermission.status.isGranted) {
-                            makeCall(context, tile.phoneNumber)
+                        if (callPermissions.allPermissionsGranted) {
+                            // Navigate back to tile grid FIRST so it sits under the overlay
                             onBack()
+                            CallOverlayService.start(
+                                context = context,
+                                phoneNumber = tile.phoneNumber,
+                                callerName = tile.label,
+                                callerImage = tile.imagePath
+                            )
                         } else {
-                            callPermission.launchPermissionRequest()
+                            callPermissions.launchMultiplePermissionRequest()
                         }
                     }
             ) {
@@ -93,9 +102,21 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                 fontWeight = FontWeight.Medium,
                 textAlign = TextAlign.Center
             )
+
+            // Warn if overlay permission is missing (admin needs to grant it)
+            if (!Settings.canDrawOverlays(context)) {
+                Spacer(modifier = Modifier.height(24.dp))
+                Text(
+                    text = "⚠ Admin: enable \"Display over other apps\" for best experience",
+                    fontSize = 13.sp,
+                    color = Color(0xFFFFCC02),
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 32.dp)
+                )
+            }
         }
 
-        // Back arrow — top-left so user can return without calling
+        // Back arrow — lets user cancel without calling
         IconButton(
             onClick = onBack,
             modifier = Modifier
@@ -109,22 +130,5 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                 modifier = Modifier.size(36.dp)
             )
         }
-    }
-}
-
-private fun makeCall(context: Context, phoneNumber: String) {
-    val intent = Intent(Intent.ACTION_CALL).apply {
-        data = Uri.parse("tel:${Uri.encode(phoneNumber)}")
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    }
-    context.startActivity(intent)
-
-    // Enable speakerphone once the call connects (if no wired headset)
-    val audio = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    if (!audio.isWiredHeadsetOn) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            audio.mode = AudioManager.MODE_IN_CALL
-            audio.isSpeakerphoneOn = true
-        }, 3000)
     }
 }

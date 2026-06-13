@@ -31,7 +31,6 @@ class CallOverlayService : Service() {
         private const val NOTIF_CHANNEL = "call_channel"
         private const val NOTIF_ID = 42
         private const val NO_ANSWER_MS = 45_000L
-        private const val SPEAKER_DELAY_MS = 3_000L
 
         fun start(context: Context, phoneNumber: String, callerName: String, callerImage: String) {
             val intent = Intent(context, CallOverlayService::class.java).apply {
@@ -50,21 +49,17 @@ class CallOverlayService : Service() {
 
     private var overlayRoot: View? = null
     private var statusLabel: TextView? = null
-    private var hangUpButton: Button? = null
 
     private val scope = CoroutineScope(Dispatchers.Main + SupervisorJob())
     private var noAnswerJob: Job? = null
     private var callEnded = false
 
-    // Deprecated but needed for API 26-30
     @Suppress("DEPRECATION")
-    private val legacyPhoneListener = object : PhoneStateListener() {
+    private val legacyListener = object : PhoneStateListener() {
         @Suppress("DEPRECATION")
-        override fun onCallStateChanged(state: Int, phoneNumber: String?) =
-            handleState(state)
+        override fun onCallStateChanged(state: Int, phoneNumber: String?) = handleState(state)
     }
 
-    // Modern callback for API 31+
     private val modernCallback: Any? by lazy {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             object : TelephonyCallback(), TelephonyCallback.CallStateListener {
@@ -85,15 +80,13 @@ class CallOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val phone = intent?.getStringExtra(EXTRA_PHONE) ?: run { stopSelf(); return START_NOT_STICKY }
-        val name = intent.getStringExtra(EXTRA_NAME) ?: ""
+        val name  = intent.getStringExtra(EXTRA_NAME)  ?: ""
         val image = intent.getStringExtra(EXTRA_IMAGE) ?: ""
 
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification(name))
 
-        if (Settings.canDrawOverlays(this)) {
-            showOverlay(name, image)
-        }
+        if (Settings.canDrawOverlays(this)) showOverlay(name, image)
 
         registerCallListener()
         placeCall(phone)
@@ -101,72 +94,72 @@ class CallOverlayService : Service() {
         return START_NOT_STICKY
     }
 
-    // ── Overlay ──────────────────────────────────────────────────────────────
+    // ── Overlay ───────────────────────────────────────────────────────────────
 
     private fun showOverlay(callerName: String, callerImagePath: String) {
         val dm = resources.displayMetrics
         fun dp(v: Int) = (v * dm.density).toInt()
 
-        // Root frame — same deep blue as the main screen
+        // ── Root frame (full-screen, dark blue) ───────────────────────────────
         val root = FrameLayout(this)
         root.setBackgroundColor(Color.parseColor("#1A237E"))
 
-        // Centre column
-        val col = LinearLayout(this)
-        col.orientation = LinearLayout.VERTICAL
-        col.gravity = Gravity.CENTER_HORIZONTAL
+        // ── Top content (photo + name + status) ───────────────────────────────
+        val topCol = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER_HORIZONTAL
+        }
 
-        // Circular photo frame
-        val photoFrame = FrameLayout(this)
-        val frameSize = dp(200)
-        val photoView = ImageView(this)
-        photoView.scaleType = ImageView.ScaleType.CENTER_CROP
-        photoView.id = View.generateViewId()
+        // Large circular photo
+        val photoSize = dp(260)
+        val photoView = ImageView(this).apply {
+            scaleType = ImageView.ScaleType.CENTER_CROP
+        }
 
-        val circle = GradientDrawable().apply {
+        val photoCircle = GradientDrawable().apply {
             shape = GradientDrawable.OVAL
             setColor(Color.parseColor("#283593"))
-            setStroke(dp(4), Color.parseColor("#80CBC4"))
+            setStroke(dp(5), Color.parseColor("#80CBC4"))
         }
-        photoFrame.background = circle
-        photoFrame.clipToOutline = true
-        photoFrame.outlineProvider = android.view.ViewOutlineProvider.BOUNDS
-        photoFrame.addView(photoView, FrameLayout.LayoutParams(frameSize, frameSize))
+        val photoFrame = FrameLayout(this).apply {
+            background = photoCircle
+            clipToOutline = true
+            outlineProvider = android.view.ViewOutlineProvider.BOUNDS
+            addView(photoView, FrameLayout.LayoutParams(photoSize, photoSize))
+        }
 
-        // Load image with Coil inside service
+        // Load photo with Coil, clip to circle
         scope.launch {
-            try {
+            runCatching {
                 val loader = ImageLoader(this@CallOverlayService)
-                val req = ImageRequest.Builder(this@CallOverlayService)
-                    .data(callerImagePath)
-                    .size(frameSize, frameSize)
-                    .allowHardware(false)
-                    .build()
-                val result = loader.execute(req)
+                val result = loader.execute(
+                    ImageRequest.Builder(this@CallOverlayService)
+                        .data(callerImagePath)
+                        .size(photoSize, photoSize)
+                        .allowHardware(false)
+                        .build()
+                )
                 result.drawable?.let { drawable ->
-                    // Clip to circle
-                    val bmp = Bitmap.createBitmap(frameSize, frameSize, Bitmap.Config.ARGB_8888)
+                    val bmp = Bitmap.createBitmap(photoSize, photoSize, Bitmap.Config.ARGB_8888)
                     val canvas = Canvas(bmp)
                     val paint = Paint(Paint.ANTI_ALIAS_FLAG)
-                    canvas.drawOval(RectF(0f, 0f, frameSize.toFloat(), frameSize.toFloat()), paint)
+                    canvas.drawOval(RectF(0f, 0f, photoSize.toFloat(), photoSize.toFloat()), paint)
                     paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
-                    drawable.setBounds(0, 0, frameSize, frameSize)
+                    drawable.setBounds(0, 0, photoSize, photoSize)
                     drawable.draw(canvas)
                     photoView.setImageBitmap(bmp)
                 }
-            } catch (_: Exception) {}
+            }
         }
 
-        // Name
         val nameView = TextView(this).apply {
             text = callerName
-            textSize = 34f
+            textSize = 36f
             setTextColor(Color.WHITE)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             gravity = Gravity.CENTER
         }
 
-        // Animated "Calling…" dots
         val statusView = TextView(this).apply {
             text = "Calling…"
             textSize = 22f
@@ -175,42 +168,52 @@ class CallOverlayService : Service() {
         }
         statusLabel = statusView
 
-        // Big red hang-up button
+        topCol.addView(photoFrame, LinearLayout.LayoutParams(photoSize, photoSize).also {
+            it.bottomMargin = dp(28)
+        })
+        topCol.addView(nameView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = dp(14) })
+        topCol.addView(statusView, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.WRAP_CONTENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ))
+
+        // Centre the top content block in the upper portion of the screen
+        val topParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            FrameLayout.LayoutParams.WRAP_CONTENT,
+            Gravity.CENTER_HORIZONTAL or Gravity.CENTER_VERTICAL
+        ).also { it.bottomMargin = dp(130) } // shift up to leave room for hang-up button
+        root.addView(topCol, topParams)
+
+        // ── Large hang-up button pinned to the bottom ─────────────────────────
+        val hangUpBg = GradientDrawable().apply {
+            shape = GradientDrawable.RECTANGLE
+            cornerRadius = dp(20).toFloat()
+            setColor(Color.parseColor("#B71C1C"))
+        }
         val hangUp = Button(this).apply {
-            text = "Hang Up"
-            textSize = 22f
+            text = "HANG UP"
+            textSize = 28f
             setTextColor(Color.WHITE)
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
-            val bg = GradientDrawable().apply {
-                shape = GradientDrawable.RECTANGLE
-                cornerRadius = dp(50).toFloat()
-                setColor(Color.parseColor("#C62828"))
-            }
-            background = bg
-            setPadding(dp(40), dp(16), dp(40), dp(16))
+            background = hangUpBg
             setOnClickListener { endCall() }
         }
-        hangUpButton = hangUp
+        val hangUpParams = FrameLayout.LayoutParams(
+            FrameLayout.LayoutParams.MATCH_PARENT,
+            dp(100),
+            Gravity.BOTTOM or Gravity.CENTER_HORIZONTAL
+        ).also {
+            it.leftMargin  = dp(32)
+            it.rightMargin = dp(32)
+            it.bottomMargin = dp(48)
+        }
+        root.addView(hangUp, hangUpParams)
 
-        // Assemble
-        col.addView(photoFrame, LinearLayout.LayoutParams(frameSize, frameSize).also { it.bottomMargin = dp(28) })
-        col.addView(nameView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.bottomMargin = dp(12) })
-        col.addView(statusView, LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.WRAP_CONTENT
-        ).also { it.bottomMargin = dp(56) })
-        col.addView(hangUp, LinearLayout.LayoutParams(dp(260), dp(72)))
-
-        val colParams = FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            FrameLayout.LayoutParams.WRAP_CONTENT,
-            Gravity.CENTER
-        )
-        root.addView(col, colParams)
-
+        // ── Add overlay to window ─────────────────────────────────────────────
         val winParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.MATCH_PARENT,
             WindowManager.LayoutParams.MATCH_PARENT,
@@ -218,14 +221,10 @@ class CallOverlayService : Service() {
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON,
             PixelFormat.OPAQUE
-        ).apply {
-            gravity = Gravity.TOP or Gravity.START
-        }
+        ).apply { gravity = Gravity.TOP or Gravity.START }
 
-        try {
-            windowManager.addView(root, winParams)
-            overlayRoot = root
-        } catch (_: Exception) {}
+        runCatching { windowManager.addView(root, winParams) }
+        overlayRoot = root
     }
 
     private fun removeOverlay() {
@@ -235,30 +234,31 @@ class CallOverlayService : Service() {
         }
     }
 
-    // ── Call ─────────────────────────────────────────────────────────────────
+    // ── Call ──────────────────────────────────────────────────────────────────
 
     private fun placeCall(phoneNumber: String) {
         val uri = Uri.parse("tel:${Uri.encode(phoneNumber)}")
-        try {
-            telecomManager.placeCall(uri, android.os.Bundle())
-        } catch (e: SecurityException) {
-            tearDown()
-            return
+        runCatching { telecomManager.placeCall(uri, android.os.Bundle()) }.onFailure {
+            tearDown(); return
         }
 
-        // Enable speakerphone shortly after call starts (if no wired headset)
+        // Speakerphone: try after 2 s (call may not be OFFHOOK yet on all devices)
         scope.launch {
-            delay(SPEAKER_DELAY_MS)
-            if (!audioManager.isWiredHeadsetOn) {
-                audioManager.mode = AudioManager.MODE_IN_CALL
-                audioManager.isSpeakerphoneOn = true
-            }
+            delay(2_000)
+            enableSpeaker()
         }
 
-        // Auto hang-up if nobody answers within NO_ANSWER_MS
+        // Auto hang-up if unanswered after 45 s
         noAnswerJob = scope.launch {
             delay(NO_ANSWER_MS)
             if (!callEnded) endCall()
+        }
+    }
+
+    private fun enableSpeaker() {
+        if (!audioManager.isWiredHeadsetOn) {
+            audioManager.mode = AudioManager.MODE_IN_CALL
+            audioManager.isSpeakerphoneOn = true
         }
     }
 
@@ -279,23 +279,27 @@ class CallOverlayService : Service() {
         stopSelf()
     }
 
-    // ── Phone state ──────────────────────────────────────────────────────────
+    // ── Phone state ───────────────────────────────────────────────────────────
 
     private fun handleState(state: Int) {
-        if (state == TelephonyManager.CALL_STATE_IDLE && !callEnded) {
-            // Call ended by remote party or system
-            callEnded = true
-            noAnswerJob?.cancel()
-            scope.launch {
-                audioManager.isSpeakerphoneOn = false
-                audioManager.mode = AudioManager.MODE_NORMAL
-                removeOverlay()
-                stopSelf()
-            }
-        } else if (state == TelephonyManager.CALL_STATE_OFFHOOK) {
-            // Call connected — update overlay status text
-            scope.launch {
-                statusLabel?.text = "Connected"
+        scope.launch {
+            when (state) {
+                TelephonyManager.CALL_STATE_OFFHOOK -> {
+                    // Call answered — enable speaker immediately and update status
+                    noAnswerJob?.cancel()
+                    enableSpeaker()
+                    statusLabel?.text = "Connected"
+                }
+                TelephonyManager.CALL_STATE_IDLE -> {
+                    if (!callEnded) {
+                        callEnded = true
+                        noAnswerJob?.cancel()
+                        audioManager.isSpeakerphoneOn = false
+                        audioManager.mode = AudioManager.MODE_NORMAL
+                        removeOverlay()
+                        stopSelf()
+                    }
+                }
             }
         }
     }
@@ -307,7 +311,7 @@ class CallOverlayService : Service() {
             }
         } else {
             @Suppress("DEPRECATION")
-            telephonyManager.listen(legacyPhoneListener, PhoneStateListener.LISTEN_CALL_STATE)
+            telephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_CALL_STATE)
         }
     }
 
@@ -318,11 +322,9 @@ class CallOverlayService : Service() {
             }
         } else {
             @Suppress("DEPRECATION")
-            telephonyManager.listen(legacyPhoneListener, PhoneStateListener.LISTEN_NONE)
+            telephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_NONE)
         }
     }
-
-    // ── Lifecycle ────────────────────────────────────────────────────────────
 
     override fun onDestroy() {
         super.onDestroy()
@@ -333,26 +335,19 @@ class CallOverlayService : Service() {
         audioManager.mode = AudioManager.MODE_NORMAL
     }
 
-    // ── Notification ─────────────────────────────────────────────────────────
+    // ── Notification ──────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
-        val chan = NotificationChannel(
-            NOTIF_CHANNEL,
-            "Active Call",
-            NotificationManager.IMPORTANCE_LOW
-        ).apply {
-            description = "Manages active phone calls"
-            setSound(null, null)
-        }
+        val chan = NotificationChannel(NOTIF_CHANNEL, "Active Call", NotificationManager.IMPORTANCE_LOW)
+            .apply { setSound(null, null) }
         getSystemService(NotificationManager::class.java).createNotificationChannel(chan)
     }
 
-    private fun buildNotification(callerName: String): Notification {
-        return Notification.Builder(this, NOTIF_CHANNEL)
+    private fun buildNotification(callerName: String): Notification =
+        Notification.Builder(this, NOTIF_CHANNEL)
             .setSmallIcon(android.R.drawable.sym_call_outgoing)
             .setContentTitle("Calling $callerName")
-            .setContentText("Tap Hang Up on screen to end call")
+            .setContentText("Use the on-screen button to hang up")
             .setOngoing(true)
             .build()
-    }
 }
