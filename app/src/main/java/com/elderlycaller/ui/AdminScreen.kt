@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -109,6 +110,12 @@ fun AdminScreen(
         )
     }
 
+    // Overlay permission banner — required for background calling
+    val overlayGranted = remember { mutableStateOf(Settings.canDrawOverlays(context)) }
+    LaunchedEffect(Unit) {
+        overlayGranted.value = Settings.canDrawOverlays(context)
+    }
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -139,6 +146,41 @@ fun AdminScreen(
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Icon(Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White)
+            }
+        }
+
+        // Overlay permission banner
+        if (!overlayGranted.value) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(Color(0xFFFFF3E0))
+                    .padding(horizontal = 16.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    Icons.Default.Warning,
+                    contentDescription = null,
+                    tint = Color(0xFFE65100),
+                    modifier = Modifier.size(20.dp)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    "\"Display over other apps\" permission needed for background calling.",
+                    fontSize = 13.sp,
+                    color = Color(0xFF4E342E),
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                TextButton(
+                    onClick = {
+                        val intent = Intent(
+                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                            Uri.parse("package:${context.packageName}")
+                        )
+                        context.startActivity(intent)
+                    }
+                ) { Text("Grant", color = Color(0xFF1565C0), fontWeight = FontWeight.Bold) }
             }
         }
 

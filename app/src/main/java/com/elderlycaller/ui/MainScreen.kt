@@ -1,12 +1,6 @@
 package com.elderlycaller.ui
 
 import android.Manifest
-import android.content.Context
-import android.content.Intent
-import android.media.AudioManager
-import android.net.Uri
-import android.os.Handler
-import android.os.Looper
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -31,10 +25,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
+import com.elderlycaller.CallOverlayService
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
-import com.google.accompanist.permissions.rememberPermissionState
+import com.google.accompanist.permissions.allPermissionsGranted
+import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
@@ -43,35 +38,20 @@ fun MainScreen(
     onAdminClick: () -> Unit
 ) {
     val context = LocalContext.current
-    val callPermission = rememberPermissionState(Manifest.permission.CALL_PHONE)
-    var showCallDialog by remember { mutableStateOf(false) }
-    var pendingCallTile by remember { mutableStateOf<Tile?>(null) }
-
-    if (showCallDialog && pendingCallTile != null) {
-        CallConfirmDialog(
-            tile = pendingCallTile!!,
-            onConfirm = {
-                showCallDialog = false
-                val tile = pendingCallTile!!
-                pendingCallTile = null
-                makeCall(context, tile.phoneNumber)
-            },
-            onDismiss = {
-                showCallDialog = false
-                pendingCallTile = null
-            }
+    val callPermissions = rememberMultiplePermissionsState(
+        listOf(
+            Manifest.permission.CALL_PHONE,
+            Manifest.permission.READ_PHONE_STATE,
+            Manifest.permission.ANSWER_PHONE_CALLS,
         )
-    }
+    )
 
     Box(
         modifier = Modifier
             .fillMaxSize()
             .background(Color(0xFF1A237E))
     ) {
-        Column(
-            modifier = Modifier.fillMaxSize()
-        ) {
-            // Header
+        Column(modifier = Modifier.fillMaxSize()) {
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -116,11 +96,15 @@ fun MainScreen(
                         TileCard(
                             tile = tile,
                             onClick = {
-                                if (callPermission.status.isGranted) {
-                                    pendingCallTile = tile
-                                    showCallDialog = true
+                                if (callPermissions.allPermissionsGranted) {
+                                    CallOverlayService.start(
+                                        context,
+                                        phoneNumber = tile.phoneNumber,
+                                        callerName = tile.label,
+                                        callerImage = tile.imagePath
+                                    )
                                 } else {
-                                    callPermission.launchPermissionRequest()
+                                    callPermissions.launchMultiplePermissionRequest()
                                 }
                             }
                         )
@@ -129,7 +113,7 @@ fun MainScreen(
             }
         }
 
-        // Hidden admin button — small, tucked in bottom-right corner
+        // Discreet admin button — bottom-right corner
         IconButton(
             onClick = onAdminClick,
             modifier = Modifier
@@ -149,10 +133,7 @@ fun MainScreen(
 }
 
 @Composable
-private fun TileCard(
-    tile: Tile,
-    onClick: () -> Unit
-) {
+private fun TileCard(tile: Tile, onClick: () -> Unit) {
     Card(
         onClick = onClick,
         modifier = Modifier
@@ -188,76 +169,6 @@ private fun TileCard(
                 maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
-            Spacer(modifier = Modifier.height(4.dp))
-            Text(
-                text = "TAP TO CALL",
-                fontSize = 14.sp,
-                color = Color(0xFF80CBC4),
-                fontWeight = FontWeight.Medium,
-                textAlign = TextAlign.Center
-            )
         }
-    }
-}
-
-@Composable
-private fun CallConfirmDialog(
-    tile: Tile,
-    onConfirm: () -> Unit,
-    onDismiss: () -> Unit
-) {
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = {
-            Text(
-                text = "Call ${tile.label}?",
-                fontSize = 26.sp,
-                fontWeight = FontWeight.Bold
-            )
-        },
-        text = {
-            Text(
-                text = tile.phoneNumber,
-                fontSize = 22.sp
-            )
-        },
-        confirmButton = {
-            Button(
-                onClick = onConfirm,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(64.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32))
-            ) {
-                Text("CALL", fontSize = 24.sp, fontWeight = FontWeight.Bold)
-            }
-        },
-        dismissButton = {
-            OutlinedButton(
-                onClick = onDismiss,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-            ) {
-                Text("Cancel", fontSize = 20.sp)
-            }
-        }
-    )
-}
-
-fun makeCall(context: Context, phoneNumber: String) {
-    val intent = Intent(Intent.ACTION_CALL).apply {
-        data = Uri.parse("tel:${Uri.encode(phoneNumber)}")
-        flags = Intent.FLAG_ACTIVITY_NEW_TASK
-    }
-    context.startActivity(intent)
-
-    // Enable speakerphone after call connects (if no wired headset)
-    val audioManager = context.getSystemService(Context.AUDIO_SERVICE) as AudioManager
-    if (!audioManager.isWiredHeadsetOn) {
-        Handler(Looper.getMainLooper()).postDelayed({
-            audioManager.isSpeakerphoneOn = true
-            audioManager.mode = AudioManager.MODE_IN_CALL
-        }, 3000)
     }
 }
