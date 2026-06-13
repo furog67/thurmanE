@@ -42,9 +42,9 @@ import kotlinx.coroutines.launch
 class CallingActivity : ComponentActivity() {
 
     companion object {
-        private const val EXTRA_PHONE = "phone"
-        private const val EXTRA_NAME  = "name"
-        private const val EXTRA_IMAGE = "image"
+        const val EXTRA_PHONE = "phone"
+        const val EXTRA_NAME  = "name"
+        const val EXTRA_IMAGE = "image"
 
         fun start(context: Context, phone: String, name: String, image: String) {
             context.startActivity(

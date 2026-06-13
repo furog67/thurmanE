@@ -1,6 +1,9 @@
 package com.elderlycaller.ui
 
 import android.Manifest
+import android.content.Intent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -42,6 +45,14 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
         )
     )
 
+    // Launch CallingActivity; when it finishes (call ended / hung up)
+    // navigate back to the tile grid automatically.
+    val callingLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) {
+        onBack()
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -53,7 +64,7 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier.fillMaxSize()
         ) {
-            // Large contact photo — tapping starts the call
+            // Large contact photo — tap to call
             Box(
                 modifier = Modifier
                     .size(280.dp)
@@ -61,14 +72,12 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            // CallingActivity takes over the screen; navigating
-                            // back here first ensures the tile grid is underneath.
-                            onBack()
-                            CallingActivity.start(
-                                context  = context,
-                                phone    = tile.phoneNumber,
-                                name     = tile.label,
-                                image    = tile.imagePath
+                            callingLauncher.launch(
+                                Intent(context, CallingActivity::class.java).apply {
+                                    putExtra(CallingActivity.EXTRA_PHONE, tile.phoneNumber)
+                                    putExtra(CallingActivity.EXTRA_NAME,  tile.label)
+                                    putExtra(CallingActivity.EXTRA_IMAGE, tile.imagePath)
+                                }
                             )
                         } else {
                             callPermissions.launchMultiplePermissionRequest()
@@ -104,7 +113,7 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
             )
         }
 
-        // Back arrow — lets user cancel without calling
+        // Back arrow — cancel without calling
         IconButton(
             onClick = onBack,
             modifier = Modifier
