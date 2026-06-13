@@ -10,9 +10,11 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import com.elderlycaller.data.Tile
 import com.elderlycaller.ui.AdminPasswordDialog
 import com.elderlycaller.ui.AdminScreen
 import com.elderlycaller.ui.MainScreen
+import com.elderlycaller.ui.PreCallScreen
 import com.elderlycaller.ui.theme.ElderlyCallerTheme
 import com.elderlycaller.viewmodel.MainViewModel
 
@@ -41,9 +43,14 @@ private fun App(viewModel: MainViewModel) {
 
     var showPasswordDialog by remember { mutableStateOf(false) }
     var inAdmin by remember { mutableStateOf(false) }
+    var preCallTile by remember { mutableStateOf<Tile?>(null) }
 
-    if (inAdmin) {
-        AdminScreen(
+    when {
+        preCallTile != null -> PreCallScreen(
+            tile = preCallTile!!,
+            onBack = { preCallTile = null }
+        )
+        inAdmin -> AdminScreen(
             tiles = tiles,
             onAddTile = viewModel::addTile,
             onUpdateTile = viewModel::updateTile,
@@ -51,20 +58,22 @@ private fun App(viewModel: MainViewModel) {
             onChangePassword = viewModel::changePassword,
             onExit = { inAdmin = false }
         )
-    } else {
-        MainScreen(
-            tiles = tiles,
-            onAdminClick = { showPasswordDialog = true }
-        )
-        if (showPasswordDialog) {
-            AdminPasswordDialog(
-                checkPassword = viewModel::checkPassword,
-                onSuccess = {
-                    showPasswordDialog = false
-                    inAdmin = true
-                },
-                onDismiss = { showPasswordDialog = false }
+        else -> {
+            MainScreen(
+                tiles = tiles,
+                onTileClick = { preCallTile = it },
+                onAdminClick = { showPasswordDialog = true }
             )
+            if (showPasswordDialog) {
+                AdminPasswordDialog(
+                    checkPassword = viewModel::checkPassword,
+                    onSuccess = {
+                        showPasswordDialog = false
+                        inAdmin = true
+                    },
+                    onDismiss = { showPasswordDialog = false }
+                )
+            }
         }
     }
 }
