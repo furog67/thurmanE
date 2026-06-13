@@ -38,7 +38,16 @@ class CallOverlayService : Service() {
                 putExtra(EXTRA_NAME, callerName)
                 putExtra(EXTRA_IMAGE, callerImage)
             }
-            context.startForegroundService(intent)
+            try {
+                context.startForegroundService(intent)
+            } catch (e: Exception) {
+                // Fallback: open phone app directly if service can't start
+                val callIntent = Intent(Intent.ACTION_CALL).apply {
+                    data = Uri.parse("tel:${Uri.encode(phoneNumber)}")
+                    flags = Intent.FLAG_ACTIVITY_NEW_TASK
+                }
+                runCatching { context.startActivity(callIntent) }
+            }
         }
     }
 
@@ -84,7 +93,12 @@ class CallOverlayService : Service() {
         val image = intent.getStringExtra(EXTRA_IMAGE) ?: ""
 
         createNotificationChannel()
-        startForeground(NOTIF_ID, buildNotification(name))
+        try {
+            startForeground(NOTIF_ID, buildNotification(name))
+        } catch (e: Exception) {
+            stopSelf()
+            return START_NOT_STICKY
+        }
 
         if (Settings.canDrawOverlays(this)) showOverlay(name, image)
 

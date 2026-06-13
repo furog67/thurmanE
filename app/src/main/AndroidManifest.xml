@@ -21,7 +21,7 @@
 
     <!-- Foreground service -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_PHONE_CALL" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
 
     <queries>
         <intent>
@@ -55,11 +55,11 @@
             </intent-filter>
         </activity>
 
-        <!-- Background call service; foregroundServiceType covers Android 14+ -->
+        <!-- mediaPlayback type works without ConnectionService/default-dialer -->
         <service
             android:name=".CallOverlayService"
             android:exported="false"
-            android:foregroundServiceType="phoneCall" />
+            android:foregroundServiceType="mediaPlayback" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
