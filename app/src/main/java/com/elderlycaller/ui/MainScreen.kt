@@ -113,11 +113,11 @@ fun MainScreen(
             }
         }
 
-        // Discreet admin button — bottom-right corner
+        // Discreet admin button — top-right corner
         IconButton(
             onClick = onAdminClick,
             modifier = Modifier
-                .align(Alignment.BottomEnd)
+                .align(Alignment.TopEnd)
                 .padding(8.dp)
                 .size(40.dp)
                 .background(Color.White.copy(alpha = 0.15f), CircleShape)
