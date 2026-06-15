@@ -16,6 +16,9 @@
     <!-- Audio -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Overlay — keeps our call screen on top of the system dialer -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.PICK" />

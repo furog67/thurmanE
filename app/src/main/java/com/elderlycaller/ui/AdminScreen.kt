@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -138,6 +139,42 @@ fun AdminScreen(
                 modifier = Modifier.align(Alignment.CenterEnd)
             ) {
                 Icon(Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White)
+            }
+        }
+
+        // One-time setup: overlay permission needed to keep call screen on top
+        if (!Settings.canDrawOverlays(context)) {
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "One-time setup: tap to allow Easy Caller to stay on screen during calls.",
+                        fontSize = 14.sp,
+                        color = Color(0xFF5D4037),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            context.startActivity(
+                                Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                            )
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Allow", fontSize = 14.sp) }
+                }
             }
         }
 
