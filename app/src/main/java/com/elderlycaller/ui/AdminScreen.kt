@@ -37,7 +37,6 @@ import androidx.core.content.FileProvider
 import coil.compose.AsyncImage
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.isGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 import java.io.File
 

@@ -29,7 +29,6 @@ import coil.compose.AsyncImage
 import com.elderlycaller.CallingActivity
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
-import com.google.accompanist.permissions.allPermissionsGranted
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 @OptIn(ExperimentalPermissionsApi::class)
