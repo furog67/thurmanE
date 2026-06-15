@@ -7,6 +7,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
+import android.provider.Settings
 import android.telecom.TelecomManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -142,10 +143,11 @@ fun AdminScreen(
             }
         }
 
-        // One-time setup: Easy Caller must be the default phone app so the
-        // system dialer never appears during a call.
+        // Default dialer management
         val telecomManager = context.getSystemService(TelecomManager::class.java)
-        if (telecomManager?.defaultDialerPackage != context.packageName) {
+        val isDefaultDialer = telecomManager?.defaultDialerPackage == context.packageName
+
+        if (!isDefaultDialer) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -166,17 +168,50 @@ fun AdminScreen(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            context.startActivity(
-                                Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
-                                    .putExtra(
-                                        TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                                        context.packageName
-                                    )
-                            )
+                            // Try the direct dialog first; if it does nothing (app not yet
+                            // recognised as a valid dialer), open default-apps settings instead.
+                            val dialerIntent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                                .putExtra(
+                                    TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                                    context.packageName
+                                )
+                            if (dialerIntent.resolveActivity(context.packageManager) != null) {
+                                context.startActivity(dialerIntent)
+                            } else {
+                                context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                            }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
                         shape = RoundedCornerShape(8.dp)
                     ) { Text("Set Up", fontSize = 14.sp) }
+                }
+            }
+        } else {
+            // Already the default dialer — show a restore button for testing
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
+                colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                shape = RoundedCornerShape(12.dp)
+            ) {
+                Row(
+                    modifier = Modifier.padding(12.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Easy Caller is the default phone app.",
+                        fontSize = 14.sp,
+                        color = Color(0xFF2E7D32),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    OutlinedButton(
+                        onClick = {
+                            context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                        },
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Restore", fontSize = 14.sp) }
                 }
             }
         }
