@@ -16,9 +16,6 @@
     <!-- Audio -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
-    <!-- Overlay — keeps our call screen on top of the system dialer -->
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
-
     <queries>
         <intent>
             <action android:name="android.intent.action.PICK" />
@@ -51,11 +48,6 @@
             </intent-filter>
         </activity>
 
-        <!--
-            CallingActivity: shown during an active call.
-            singleTop prevents duplicate instances when reordered to front.
-            showWhenLocked / turnScreenOn ensure it appears over the lock screen.
-        -->
         <activity
             android:name=".CallingActivity"
             android:exported="false"
@@ -63,6 +55,23 @@
             android:screenOrientation="portrait"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
+
+        <!--
+            InCallService: when Easy Caller is the default phone app, Android routes
+            all call events here instead of to the system dialer's in-call screen.
+            IN_CALL_SERVICE_UI=true tells Telecom that we own the call UI.
+        -->
+        <service
+            android:name=".EasyCallerInCallService"
+            android:permission="android.permission.BIND_INCALL_SERVICE"
+            android:exported="true">
+            <meta-data
+                android:name="android.telecom.IN_CALL_SERVICE_UI"
+                android:value="true" />
+            <intent-filter>
+                <action android:name="android.telecom.InCallService" />
+            </intent-filter>
+        </service>
 
         <provider
             android:name="androidx.core.content.FileProvider"

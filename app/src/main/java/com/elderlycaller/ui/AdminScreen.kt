@@ -7,7 +7,7 @@ import android.net.Uri
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
-import android.provider.Settings
+import android.telecom.TelecomManager
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -142,8 +142,10 @@ fun AdminScreen(
             }
         }
 
-        // One-time setup: overlay permission needed to keep call screen on top
-        if (!Settings.canDrawOverlays(context)) {
+        // One-time setup: Easy Caller must be the default phone app so the
+        // system dialer never appears during a call.
+        val telecomManager = context.getSystemService(TelecomManager::class.java)
+        if (telecomManager?.defaultDialerPackage != context.packageName) {
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -156,7 +158,7 @@ fun AdminScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "One-time setup: tap to allow Easy Caller to stay on screen during calls.",
+                        text = "One-time setup: set Easy Caller as the default phone app so only this screen appears during calls.",
                         fontSize = 14.sp,
                         color = Color(0xFF5D4037),
                         modifier = Modifier.weight(1f)
@@ -165,15 +167,16 @@ fun AdminScreen(
                     Button(
                         onClick = {
                             context.startActivity(
-                                Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${context.packageName}")
-                                )
+                                Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                                    .putExtra(
+                                        TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                                        context.packageName
+                                    )
                             )
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
                         shape = RoundedCornerShape(8.dp)
-                    ) { Text("Allow", fontSize = 14.sp) }
+                    ) { Text("Set Up", fontSize = 14.sp) }
                 }
             }
         }
