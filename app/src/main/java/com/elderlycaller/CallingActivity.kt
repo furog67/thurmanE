@@ -158,10 +158,12 @@ class CallingActivity : ComponentActivity() {
         if (callEnded) return
         callEnded = true
         // Prefer Call.disconnect() via InCallService; fall back to TelecomManager
-        EasyCallerInCallService.activeCall?.disconnect()
-            ?: if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                runCatching { telecomManager.endCall() }
-            }
+        val call = EasyCallerInCallService.activeCall
+        if (call != null) {
+            call.disconnect()
+        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+            runCatching { telecomManager.endCall() }
+        }
         resetAudio()
         finish()
     }
