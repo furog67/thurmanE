@@ -61,6 +61,10 @@ class CallingActivity : ComponentActivity() {
     private lateinit var telephonyManager: TelephonyManager
 
     private var callEnded = false
+    // Registering the telephony listener fires an immediate callback with the
+    // *current* state, which is IDLE before placeCall() has run — only treat
+    // IDLE as "call ended" after we've actually observed the call go OFFHOOK.
+    private var callStarted = false
     private val callStatus = mutableStateOf("Calling…")
 
     // ── Phone state listener (API 26-30) ─────────────────────────────────────
@@ -172,11 +176,12 @@ class CallingActivity : ComponentActivity() {
         runOnUiThread {
             when (state) {
                 TelephonyManager.CALL_STATE_OFFHOOK -> {
+                    callStarted = true
                     callStatus.value = "Connected"
                     enableSpeaker()
                 }
                 TelephonyManager.CALL_STATE_IDLE -> {
-                    if (!callEnded) {
+                    if (callStarted && !callEnded) {
                         callEnded = true
                         resetAudio()
                         finish()
