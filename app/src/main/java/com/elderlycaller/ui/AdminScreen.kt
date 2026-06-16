@@ -145,6 +145,16 @@ fun AdminScreen(
             }
         }
 
+        Text(
+            text = "Build ${com.elderlycaller.BuildConfig.VERSION_NAME} (${com.elderlycaller.BuildConfig.VERSION_CODE}) — ${com.elderlycaller.BuildConfig.BUILD_TIME}",
+            fontSize = 12.sp,
+            color = Color.Gray,
+            modifier = Modifier
+                .fillMaxWidth()
+                .background(Color(0xFFE0E0E0))
+                .padding(horizontal = 16.dp, vertical = 4.dp)
+        )
+
         // Default dialer management
         val telecomManager = context.getSystemService(TelecomManager::class.java)
         var dialerRefreshTrigger by remember { mutableIntStateOf(0) }

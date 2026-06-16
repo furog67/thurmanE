@@ -1,3 +1,6 @@
+import java.text.SimpleDateFormat
+import java.util.Date
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -15,6 +18,14 @@ android {
         targetSdk = 35
         versionCode = 1
         versionName = "1.0"
+
+        // Recomputed on every build so the Admin screen can show proof that a
+        // fresh build was installed, not a stale cached APK.
+        buildConfigField(
+            "String",
+            "BUILD_TIME",
+            "\"${SimpleDateFormat("yyyy-MM-dd HH:mm").format(Date())}\""
+        )
     }
 
     buildTypes {
@@ -38,6 +49,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 }
 
