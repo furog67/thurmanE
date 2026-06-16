@@ -14,6 +14,22 @@ class EasyCallerInCallService : InCallService() {
     companion object {
         @Volatile var activeCall: Call? = null
             private set
+
+        // Audio routing for Telecom-managed calls must go through the active
+        // InCallService — AudioManager.isSpeakerphoneOn gets silently overridden
+        // by Telecom once a call is connected through it.
+        @Volatile var activeService: EasyCallerInCallService? = null
+            private set
+    }
+
+    override fun onCreate() {
+        super.onCreate()
+        activeService = this
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        if (activeService == this) activeService = null
     }
 
     private val callStateCallback = object : Call.Callback() {
@@ -46,3 +62,4 @@ class EasyCallerInCallService : InCallService() {
         if (activeCall == call) activeCall = null
     }
 }
+

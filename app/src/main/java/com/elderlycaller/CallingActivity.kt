@@ -5,6 +5,7 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.telecom.CallAudioState
 import android.telecom.TelecomManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyCallback
@@ -145,22 +146,35 @@ class CallingActivity : ComponentActivity() {
         }
         lifecycleScope.launch {
             delay(45_000)
-            if (!callEnded) endCall()
+            // Only auto-hangup if the call was never answered — once callStarted
+            // is true the recipient is on the line and must not be cut off.
+            if (!callStarted && !callEnded) endCall()
         }
     }
 
     private fun enableSpeaker() {
-        if (!audioManager.isWiredHeadsetOn) {
+        if (audioManager.isWiredHeadsetOn) return
+        // Calls placed through Telecom (required once Easy Caller is the default
+        // dialer) have their audio route managed by Telecom itself — setting
+        // AudioManager.isSpeakerphoneOn directly gets silently overridden. The
+        // InCallService's setAudioRoute() is the only API that actually sticks.
+        val service = EasyCallerInCallService.activeService
+        if (service != null) {
+            service.setAudioRoute(CallAudioState.ROUTE_SPEAKER)
+        } else {
             audioManager.mode = AudioManager.MODE_IN_CALL
             audioManager.isSpeakerphoneOn = true
         }
-        speakerOn.value = audioManager.isSpeakerphoneOn
     }
 
     private fun resetAudio() {
-        audioManager.isSpeakerphoneOn = false
-        audioManager.mode = AudioManager.MODE_NORMAL
-        speakerOn.value = false
+        val service = EasyCallerInCallService.activeService
+        if (service != null) {
+            service.setAudioRoute(CallAudioState.ROUTE_EARPIECE)
+        } else {
+            audioManager.isSpeakerphoneOn = false
+            audioManager.mode = AudioManager.MODE_NORMAL
+        }
     }
 
     // Polls the actual OS audio state rather than trusting what we asked for,
@@ -169,7 +183,12 @@ class CallingActivity : ComponentActivity() {
     private fun watchSpeakerState() {
         lifecycleScope.launch {
             while (!callEnded) {
-                speakerOn.value = audioManager.isSpeakerphoneOn
+                val service = EasyCallerInCallService.activeService
+                speakerOn.value = if (service != null) {
+                    service.callAudioState?.route == CallAudioState.ROUTE_SPEAKER
+                } else {
+                    audioManager.isSpeakerphoneOn
+                }
                 delay(500)
             }
         }
