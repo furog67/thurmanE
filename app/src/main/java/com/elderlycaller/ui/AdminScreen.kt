@@ -1,9 +1,11 @@
 package com.elderlycaller.ui
 
 import android.Manifest
+import android.app.role.RoleManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.os.Environment
 import android.provider.ContactsContract
 import android.provider.MediaStore
@@ -145,7 +147,16 @@ fun AdminScreen(
 
         // Default dialer management
         val telecomManager = context.getSystemService(TelecomManager::class.java)
-        val isDefaultDialer = telecomManager?.defaultDialerPackage == context.packageName
+        var dialerRefreshTrigger by remember { mutableIntStateOf(0) }
+        val isDefaultDialer = remember(dialerRefreshTrigger) {
+            telecomManager?.defaultDialerPackage == context.packageName
+        }
+
+        val roleRequestLauncher = rememberLauncherForActivityResult(
+            ActivityResultContracts.StartActivityForResult()
+        ) {
+            dialerRefreshTrigger++
+        }
 
         if (!isDefaultDialer) {
             Card(
@@ -168,17 +179,28 @@ fun AdminScreen(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
-                            // Try the direct dialog first; if it does nothing (app not yet
-                            // recognised as a valid dialer), open default-apps settings instead.
-                            val dialerIntent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
-                                .putExtra(
-                                    TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
-                                    context.packageName
-                                )
-                            if (dialerIntent.resolveActivity(context.packageManager) != null) {
-                                context.startActivity(dialerIntent)
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                                // ACTION_CHANGE_DEFAULT_DIALER was removed in Android 10+;
+                                // RoleManager is the only working mechanism now.
+                                val roleManager = context.getSystemService(RoleManager::class.java)
+                                if (roleManager != null && roleManager.isRoleAvailable(RoleManager.ROLE_DIALER)) {
+                                    roleRequestLauncher.launch(
+                                        roleManager.createRequestRoleIntent(RoleManager.ROLE_DIALER)
+                                    )
+                                } else {
+                                    context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                                }
                             } else {
-                                context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                                val dialerIntent = Intent(TelecomManager.ACTION_CHANGE_DEFAULT_DIALER)
+                                    .putExtra(
+                                        TelecomManager.EXTRA_CHANGE_DEFAULT_DIALER_PACKAGE_NAME,
+                                        context.packageName
+                                    )
+                                if (dialerIntent.resolveActivity(context.packageManager) != null) {
+                                    roleRequestLauncher.launch(dialerIntent)
+                                } else {
+                                    context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                                }
                             }
                         },
                         colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
@@ -208,7 +230,9 @@ fun AdminScreen(
                     Spacer(Modifier.width(8.dp))
                     OutlinedButton(
                         onClick = {
-                            context.startActivity(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
+                            // Opens the OS "Default apps" screen so the tester can pick the
+                            // phone's original dialer back; refreshes this card on return.
+                            roleRequestLauncher.launch(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
                         },
                         shape = RoundedCornerShape(8.dp)
                     ) { Text("Restore", fontSize = 14.sp) }
