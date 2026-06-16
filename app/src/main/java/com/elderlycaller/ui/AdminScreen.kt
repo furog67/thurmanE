@@ -189,6 +189,9 @@ fun AdminScreen(
                     Spacer(Modifier.width(8.dp))
                     Button(
                         onClick = {
+                            // Screen pinning blocks launching other apps' screens —
+                            // unpin first so the system dialer picker can open.
+                            (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
                             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                                 // ACTION_CHANGE_DEFAULT_DIALER was removed in Android 10+;
                                 // RoleManager is the only working mechanism now.
@@ -242,11 +245,41 @@ fun AdminScreen(
                         onClick = {
                             // Opens the OS "Default apps" screen so the tester can pick the
                             // phone's original dialer back; refreshes this card on return.
+                            (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
                             roleRequestLauncher.launch(Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS))
                         },
                         shape = RoundedCornerShape(8.dp)
                     ) { Text("Restore", fontSize = 14.sp) }
                 }
+            }
+        }
+
+        // Kiosk lockdown — let the admin temporarily reach Home/Recents/Settings
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
+            shape = RoundedCornerShape(12.dp)
+        ) {
+            Row(
+                modifier = Modifier.padding(12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "The app is locked to the screen so the user can't reach Home or Settings.",
+                    fontSize = 14.sp,
+                    color = Color(0xFF0D47A1),
+                    modifier = Modifier.weight(1f)
+                )
+                Spacer(Modifier.width(8.dp))
+                Button(
+                    onClick = {
+                        (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Unlock Navigation", fontSize = 14.sp) }
             }
         }
 

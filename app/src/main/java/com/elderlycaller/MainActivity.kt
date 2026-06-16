@@ -35,6 +35,13 @@ class MainActivity : ComponentActivity() {
             }
         }
     }
+
+    override fun onResume() {
+        super.onResume()
+        // Re-pin every time the app comes to the foreground — covers first
+        // launch, returning from the Admin "Unlock" exit, and reboot.
+        KioskMode.pin(this)
+    }
 }
 
 @Composable
