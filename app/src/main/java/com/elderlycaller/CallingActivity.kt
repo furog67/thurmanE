@@ -66,6 +66,7 @@ class CallingActivity : ComponentActivity() {
     // IDLE as "call ended" after we've actually observed the call go OFFHOOK.
     private var callStarted = false
     private val callStatus = mutableStateOf("Calling…")
+    private val speakerOn = mutableStateOf(false)
 
     // ── Phone state listener (API 26-30) ─────────────────────────────────────
 
@@ -111,6 +112,7 @@ class CallingActivity : ComponentActivity() {
 
         registerCallListener()
         placeCall(phone)
+        watchSpeakerState()
 
         setContent {
             ElderlyCallerTheme {
@@ -118,6 +120,7 @@ class CallingActivity : ComponentActivity() {
                     callerName  = name,
                     callerImage = image,
                     status      = callStatus.value,
+                    speakerOn   = speakerOn.value,
                     onHangUp    = ::endCall
                 )
             }
@@ -151,11 +154,25 @@ class CallingActivity : ComponentActivity() {
             audioManager.mode = AudioManager.MODE_IN_CALL
             audioManager.isSpeakerphoneOn = true
         }
+        speakerOn.value = audioManager.isSpeakerphoneOn
     }
 
     private fun resetAudio() {
         audioManager.isSpeakerphoneOn = false
         audioManager.mode = AudioManager.MODE_NORMAL
+        speakerOn.value = false
+    }
+
+    // Polls the actual OS audio state rather than trusting what we asked for,
+    // so the label reflects reality if a headset/Bluetooth device changes the
+    // route out from under us mid-call.
+    private fun watchSpeakerState() {
+        lifecycleScope.launch {
+            while (!callEnded) {
+                speakerOn.value = audioManager.isSpeakerphoneOn
+                delay(500)
+            }
+        }
     }
 
     fun endCall() {
@@ -223,6 +240,7 @@ private fun CallingScreen(
     callerName: String,
     callerImage: String,
     status: String,
+    speakerOn: Boolean,
     onHangUp: () -> Unit
 ) {
     Box(
@@ -258,6 +276,14 @@ private fun CallingScreen(
                 text = status,
                 fontSize = 22.sp,
                 color = Color(0xFF80CBC4),
+                textAlign = TextAlign.Center
+            )
+            Spacer(Modifier.height(10.dp))
+            Text(
+                text = if (speakerOn) "🔊 Speakerphone ON" else "🔇 Speakerphone OFF",
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Medium,
+                color = if (speakerOn) Color(0xFFA5D6A7) else Color(0xFFEF9A9A),
                 textAlign = TextAlign.Center
             )
         }
