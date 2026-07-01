@@ -5,16 +5,13 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Build
 import android.os.Bundle
+import android.telecom.Call
 import android.telecom.CallAudioState
 import android.telecom.TelecomManager
-import android.telephony.PhoneStateListener
-import android.telephony.TelephonyCallback
-import android.telephony.TelephonyManager
 import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.addCallback
 import androidx.activity.compose.setContent
-import androidx.annotation.RequiresApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -59,35 +56,11 @@ class CallingActivity : ComponentActivity() {
 
     private lateinit var telecomManager: TelecomManager
     private lateinit var audioManager: AudioManager
-    private lateinit var telephonyManager: TelephonyManager
 
     private var callEnded = false
-    // Registering the telephony listener fires an immediate callback with the
-    // *current* state, which is IDLE before placeCall() has run — only treat
-    // IDLE as "call ended" after we've actually observed the call go OFFHOOK.
     private var callStarted = false
     private val callStatus = mutableStateOf("Calling…")
     private val speakerOn = mutableStateOf(false)
-
-    // ── Phone state listener (API 26-30) ─────────────────────────────────────
-
-    @Suppress("DEPRECATION")
-    private val legacyListener = object : PhoneStateListener() {
-        @Suppress("DEPRECATION")
-        override fun onCallStateChanged(state: Int, number: String?) = handleState(state)
-    }
-
-    // ── TelephonyCallback (API 31+) ───────────────────────────────────────────
-
-    private val modernCallback: Any? by lazy {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) buildModernCallback() else null
-    }
-
-    @RequiresApi(Build.VERSION_CODES.S)
-    private fun buildModernCallback() =
-        object : TelephonyCallback(), TelephonyCallback.CallStateListener {
-            override fun onCallStateChanged(state: Int) = handleState(state)
-        }
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -98,9 +71,8 @@ class CallingActivity : ComponentActivity() {
         val name  = intent.getStringExtra(EXTRA_NAME)  ?: ""
         val image = intent.getStringExtra(EXTRA_IMAGE) ?: ""
 
-        telecomManager   = getSystemService(TELECOM_SERVICE)   as TelecomManager
-        audioManager     = getSystemService(AUDIO_SERVICE)     as AudioManager
-        telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
+        telecomManager = getSystemService(TELECOM_SERVICE) as TelecomManager
+        audioManager   = getSystemService(AUDIO_SERVICE)   as AudioManager
 
         window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         setShowWhenLocked(true)
@@ -111,7 +83,12 @@ class CallingActivity : ComponentActivity() {
             // else swallow — user must tap HANG UP
         }
 
-        registerCallListener()
+        // Collect authoritative call state from InCallService — no spurious
+        // initial-value callback unlike TelephonyManager's PhoneStateListener.
+        lifecycleScope.launch {
+            EasyCallerInCallService.callState.collect { handleCallState(it) }
+        }
+
         placeCall(phone)
         watchSpeakerState()
 
@@ -130,7 +107,6 @@ class CallingActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        unregisterCallListener()
         if (!callEnded) resetAudio()
     }
 
@@ -208,46 +184,21 @@ class CallingActivity : ComponentActivity() {
         finish()
     }
 
-    private fun handleState(state: Int) {
-        runOnUiThread {
-            when (state) {
-                TelephonyManager.CALL_STATE_OFFHOOK -> {
-                    callStarted = true
-                    callStatus.value = "Connected"
-                    enableSpeaker()
+    private fun handleCallState(state: Int) {
+        when (state) {
+            Call.STATE_ACTIVE -> {
+                callStarted = true
+                callStatus.value = "Connected"
+                enableSpeaker()
+            }
+            Call.STATE_DISCONNECTED,
+            Call.STATE_DISCONNECTING -> {
+                if (!callEnded) {
+                    callEnded = true
+                    resetAudio()
+                    finish()
                 }
-                TelephonyManager.CALL_STATE_IDLE -> {
-                    if (callStarted && !callEnded) {
-                        callEnded = true
-                        resetAudio()
-                        finish()
-                    }
-                }
             }
-        }
-    }
-
-    // ── Telephony listener registration ───────────────────────────────────────
-
-    private fun registerCallListener() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (modernCallback as? TelephonyCallback)?.let {
-                telephonyManager.registerTelephonyCallback(mainExecutor, it)
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            telephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_CALL_STATE)
-        }
-    }
-
-    private fun unregisterCallListener() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-            (modernCallback as? TelephonyCallback)?.let {
-                telephonyManager.unregisterTelephonyCallback(it)
-            }
-        } else {
-            @Suppress("DEPRECATION")
-            telephonyManager.listen(legacyListener, PhoneStateListener.LISTEN_NONE)
         }
     }
 }
