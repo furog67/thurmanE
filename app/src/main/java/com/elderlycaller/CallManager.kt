@@ -61,6 +61,9 @@ object CallManager {
 
     fun startCall(tile: Tile) {
         DebugLog.log("CallManager.startCall ${tile.phoneNumber} defaultDialer=${isDefaultDialer()}")
+        // Foreground service first — keeps our process alive on OEMs (Motorola)
+        // that otherwise hard-kill it moments after the InCallService binds.
+        appContext?.let { CallForegroundService.start(it) }
         callJob?.cancel()
         activeTile     = tile
         callEnded      = false
@@ -73,19 +76,6 @@ object CallManager {
             launch { placeCall(tile.phoneNumber) }
             launch { watchSpeakerState() }
             launch { collectCallState() }
-            launch { heartbeat() }
-        }
-    }
-
-    // Times how long our process survives after placing the call. If the process
-    // is being hard-killed we simply stop seeing these lines. Sub-second ticks at
-    // first because the process has been dying in under a second.
-    private suspend fun heartbeat() {
-        var ms = 0
-        while (ms < 12_000) {
-            delay(250)
-            ms += 250
-            DebugLog.log("heartbeat +${ms}ms bound=${EasyCallerInCallService.activeService != null} callActive=${callActive.value}")
         }
     }
 
@@ -101,6 +91,7 @@ object CallManager {
         resetAudio()
         callActive.value = false
         activeTile = null
+        appContext?.let { CallForegroundService.stop(it) }
         callJob?.cancel()
         callJob = null
     }
@@ -148,6 +139,7 @@ object CallManager {
                         resetAudio()
                         callActive.value = false
                         activeTile = null
+                        appContext?.let { CallForegroundService.stop(it) }
                         callJob?.cancel()
                     }
                 }

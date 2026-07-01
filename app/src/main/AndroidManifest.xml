@@ -16,6 +16,9 @@
     <!-- Audio -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
+    <!-- Keep our process alive during a call on aggressive OEMs (Motorola) -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
     <!-- Kiosk lockdown: relaunch on reboot -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
@@ -81,6 +84,11 @@
                 <action android:name="android.telecom.InCallService" />
             </intent-filter>
         </service>
+
+        <service
+            android:name=".CallForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="phoneCall" />
 
         <receiver
             android:name=".BootReceiver"
