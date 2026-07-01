@@ -128,13 +128,6 @@ class CallingActivity : ComponentActivity() {
         }
     }
 
-    override fun onResume() {
-        super.onResume()
-        // Incoming calls launch this in a new task (FLAG_ACTIVITY_NEW_TASK),
-        // which doesn't inherit MainActivity's pinned state — pin here too.
-        KioskMode.pin(this)
-    }
-
     override fun onDestroy() {
         super.onDestroy()
         unregisterCallListener()
