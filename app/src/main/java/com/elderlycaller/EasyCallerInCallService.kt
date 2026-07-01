@@ -35,6 +35,7 @@ class EasyCallerInCallService : InCallService() {
 
     override fun onDestroy() {
         super.onDestroy()
+        DebugLog.log("InCallSvc.onDestroy")
         if (activeService == this) activeService = null
     }
 

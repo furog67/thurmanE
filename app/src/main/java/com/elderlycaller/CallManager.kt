@@ -32,7 +32,10 @@ object CallManager {
         appContext!!.getSystemService(Context.AUDIO_SERVICE) as AudioManager
 
     // Persistent coroutine scope — not tied to any Activity lifecycle.
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+    private val exceptionHandler = kotlinx.coroutines.CoroutineExceptionHandler { _, e ->
+        DebugLog.log("COROUTINE CRASH: ${e.javaClass.simpleName}: ${e.message}")
+    }
+    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main + exceptionHandler)
     private var callJob: Job? = null
 
     // Compose-observable state — readable from any recomposition of App().
@@ -70,6 +73,18 @@ object CallManager {
             launch { placeCall(tile.phoneNumber) }
             launch { watchSpeakerState() }
             launch { collectCallState() }
+            launch { heartbeat() }
+        }
+    }
+
+    // Times how long our process survives after placing the call. If the process
+    // is being hard-killed we simply stop seeing these lines.
+    private suspend fun heartbeat() {
+        var elapsed = 0
+        while (elapsed < 10) {
+            delay(1_000)
+            elapsed++
+            DebugLog.log("heartbeat +${elapsed}s bound=${EasyCallerInCallService.activeService != null} callActive=${callActive.value}")
         }
     }
 
