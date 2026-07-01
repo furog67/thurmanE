@@ -2,8 +2,6 @@ package com.elderlycaller.ui
 
 import android.Manifest
 import android.content.Intent
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -44,14 +42,6 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
         )
     )
 
-    // Launch CallingActivity; when it finishes (call ended / hung up)
-    // navigate back to the tile grid automatically.
-    val callingLauncher = rememberLauncherForActivityResult(
-        ActivityResultContracts.StartActivityForResult()
-    ) {
-        onBack()
-    }
-
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -71,13 +61,19 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            callingLauncher.launch(
+                            // CallingActivity is singleInstance (its own isolated task)
+                            // so Telecom's singleTask re-launch of MainActivity can never
+                            // clear it off the stack. Return to the tile grid immediately
+                            // so there is no PreCallScreen lingering behind the call UI.
+                            context.startActivity(
                                 Intent(context, CallingActivity::class.java).apply {
                                     putExtra(CallingActivity.EXTRA_PHONE, tile.phoneNumber)
                                     putExtra(CallingActivity.EXTRA_NAME,  tile.label)
                                     putExtra(CallingActivity.EXTRA_IMAGE, tile.imagePath)
+                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                             )
+                            onBack()
                         } else {
                             callPermissions.launchMultiplePermissionRequest()
                         }

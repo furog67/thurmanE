@@ -64,10 +64,15 @@
             </intent-filter>
         </activity>
 
+        <!--
+            singleInstance gives CallingActivity its own isolated task so it
+            can never be cleared by MainActivity's singleTask re-launch (which
+            Telecom fires when surfacing the default dialer's in-call UI).
+        -->
         <activity
             android:name=".CallingActivity"
             android:exported="false"
-            android:launchMode="singleTop"
+            android:launchMode="singleInstance"
             android:screenOrientation="portrait"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />
