@@ -59,6 +59,10 @@ class CallingActivity : ComponentActivity() {
 
     private var callEnded = false
     private var callStarted = false
+    // Set to true the first time InCallService reports any in-progress call state
+    // for this session. Guards against a stale STATE_DISCONNECTED left in the
+    // StateFlow from a previous call triggering an immediate finish().
+    private var callRegistered = false
     private val callStatus = mutableStateOf("Calling…")
     private val speakerOn = mutableStateOf(false)
 
@@ -186,14 +190,20 @@ class CallingActivity : ComponentActivity() {
 
     private fun handleCallState(state: Int) {
         when (state) {
+            Call.STATE_CONNECTING,
+            Call.STATE_DIALING,
+            Call.STATE_RINGING -> callRegistered = true
             Call.STATE_ACTIVE -> {
+                callRegistered = true
                 callStarted = true
                 callStatus.value = "Connected"
                 enableSpeaker()
             }
             Call.STATE_DISCONNECTED,
             Call.STATE_DISCONNECTING -> {
-                if (!callEnded) {
+                // Only finish if InCallService has confirmed this call is live —
+                // without callRegistered, STATE_DISCONNECTED is stale from a prior call.
+                if (!callEnded && callRegistered) {
                     callEnded = true
                     resetAudio()
                     finish()

@@ -45,6 +45,9 @@ class EasyCallerInCallService : InCallService() {
     }
 
     override fun onCallAdded(call: Call) {
+        // Reset to STATE_NEW before processing so CallingActivity's StateFlow collector
+        // never sees a stale STATE_DISCONNECTED left over from a prior call.
+        _callState.value = Call.STATE_NEW
         activeCall = call
         call.registerCallback(callStateCallback)
         _callState.value = call.details.state
