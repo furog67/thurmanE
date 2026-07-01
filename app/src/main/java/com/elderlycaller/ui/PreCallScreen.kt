@@ -1,7 +1,6 @@
 package com.elderlycaller.ui
 
 import android.Manifest
-import android.content.Intent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,22 +17,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
-import com.elderlycaller.CallingActivity
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
 
 @OptIn(ExperimentalPermissionsApi::class)
 @Composable
-fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
-    val context = LocalContext.current
-
+fun PreCallScreen(tile: Tile, onBack: () -> Unit, onCall: (Tile) -> Unit) {
     val callPermissions = rememberMultiplePermissionsState(
         listOf(
             Manifest.permission.CALL_PHONE,
@@ -61,16 +56,7 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            // CallingActivity is singleTop in the same task as MainActivity,
-                            // so no new-task flag is needed and kiosk pinning is never broken.
-                            context.startActivity(
-                                Intent(context, CallingActivity::class.java).apply {
-                                    putExtra(CallingActivity.EXTRA_PHONE, tile.phoneNumber)
-                                    putExtra(CallingActivity.EXTRA_NAME,  tile.label)
-                                    putExtra(CallingActivity.EXTRA_IMAGE, tile.imagePath)
-                                }
-                            )
-                            onBack()
+                            onCall(tile)
                         } else {
                             callPermissions.launchMultiplePermissionRequest()
                         }

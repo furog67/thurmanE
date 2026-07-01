@@ -65,19 +65,6 @@
         </activity>
 
         <!--
-            singleTop: CallingActivity lives in MainActivity's existing task so
-            lock task mode never blocks its launch — only new-task creation is
-            restricted by lock task, not pushes within the same task.
-        -->
-        <activity
-            android:name=".CallingActivity"
-            android:exported="false"
-            android:launchMode="singleTop"
-            android:screenOrientation="portrait"
-            android:showWhenLocked="true"
-            android:turnScreenOn="true" />
-
-        <!--
             InCallService: when Easy Caller is the default phone app, Android routes
             all call events here instead of to the system dialer's in-call screen.
             IN_CALL_SERVICE_UI=true tells Telecom that we own the call UI.
