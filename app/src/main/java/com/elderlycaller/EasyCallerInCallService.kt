@@ -1,8 +1,10 @@
 package com.elderlycaller
 
+import android.app.Activity
 import android.content.Intent
 import android.telecom.Call
 import android.telecom.InCallService
+import java.lang.ref.WeakReference
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -20,6 +22,11 @@ class EasyCallerInCallService : InCallService() {
 
         @Volatile var activeService: EasyCallerInCallService? = null
             private set
+
+        // Weak reference to MainActivity — used to launch CallingActivity for incoming
+        // calls within the existing (potentially kiosk-pinned) task rather than creating
+        // a new task that lock task mode would block.
+        var mainActivity: WeakReference<Activity>? = null
 
         // CallingActivity collects this instead of using TelephonyManager, which
         // fires a spurious IDLE callback immediately on registration and can cause
@@ -53,17 +60,23 @@ class EasyCallerInCallService : InCallService() {
         _callState.value = call.details.state
 
         // Outgoing calls: CallingActivity is already on screen.
-        // Incoming calls: launch CallingActivity so the user can answer or decline.
+        // Incoming calls: launch CallingActivity via the stored activity reference so it
+        // starts within the existing (kiosk-pinned) task rather than a new task that lock
+        // task mode would block. Fall back to FLAG_ACTIVITY_NEW_TASK if no activity ref.
         if (call.details.state == Call.STATE_RINGING) {
             val number = call.details.handle?.schemeSpecificPart ?: ""
-            startActivity(
-                Intent(this, CallingActivity::class.java).apply {
-                    flags = Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP
-                    putExtra(CallingActivity.EXTRA_PHONE, number)
-                    putExtra(CallingActivity.EXTRA_NAME, "Incoming Call")
-                    putExtra(CallingActivity.EXTRA_IMAGE, "")
-                }
-            )
+            val intent = Intent(this, CallingActivity::class.java).apply {
+                putExtra(CallingActivity.EXTRA_PHONE, number)
+                putExtra(CallingActivity.EXTRA_NAME, "Incoming Call")
+                putExtra(CallingActivity.EXTRA_IMAGE, "")
+            }
+            val activity = mainActivity?.get()
+            if (activity != null && !activity.isFinishing) {
+                activity.startActivity(intent)
+            } else {
+                intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                startActivity(intent)
+            }
         }
     }
 

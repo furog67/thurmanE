@@ -65,14 +65,14 @@
         </activity>
 
         <!--
-            singleInstance gives CallingActivity its own isolated task so it
-            can never be cleared by MainActivity's singleTask re-launch (which
-            Telecom fires when surfacing the default dialer's in-call UI).
+            singleTop: CallingActivity lives in MainActivity's existing task so
+            lock task mode never blocks its launch — only new-task creation is
+            restricted by lock task, not pushes within the same task.
         -->
         <activity
             android:name=".CallingActivity"
             android:exported="false"
-            android:launchMode="singleInstance"
+            android:launchMode="singleTop"
             android:screenOrientation="portrait"
             android:showWhenLocked="true"
             android:turnScreenOn="true" />

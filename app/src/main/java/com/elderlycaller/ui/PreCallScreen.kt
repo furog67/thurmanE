@@ -25,7 +25,6 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.elderlycaller.CallingActivity
-import com.elderlycaller.KioskMode
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -62,17 +61,13 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            // Lock task mode blocks launching a new task — unpin first so
-                            // CallingActivity (singleInstance = own isolated task) can
-                            // appear. MainActivity.onResume() re-pins when the tile grid
-                            // returns after the call ends.
-                            (context as? android.app.Activity)?.let { KioskMode.unpin(it) }
+                            // CallingActivity is singleTop in the same task as MainActivity,
+                            // so no new-task flag is needed and kiosk pinning is never broken.
                             context.startActivity(
                                 Intent(context, CallingActivity::class.java).apply {
                                     putExtra(CallingActivity.EXTRA_PHONE, tile.phoneNumber)
                                     putExtra(CallingActivity.EXTRA_NAME,  tile.label)
                                     putExtra(CallingActivity.EXTRA_IMAGE, tile.imagePath)
-                                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                                 }
                             )
                             onBack()

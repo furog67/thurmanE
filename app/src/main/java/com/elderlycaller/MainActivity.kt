@@ -16,6 +16,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.ContextCompat
 import com.elderlycaller.data.Tile
+import java.lang.ref.WeakReference
 import com.elderlycaller.ui.AdminPasswordDialog
 import com.elderlycaller.ui.AdminScreen
 import com.elderlycaller.ui.MainScreen
@@ -57,6 +58,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        EasyCallerInCallService.mainActivity = WeakReference(this)
         // Re-pin every time the app comes to the foreground — covers first
         // launch, returning from the Admin "Unlock" exit, and reboot.
         KioskMode.pin(this)
