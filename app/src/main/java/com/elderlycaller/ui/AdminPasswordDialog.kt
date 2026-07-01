@@ -19,6 +19,14 @@ fun AdminPasswordDialog(
     var input by remember { mutableStateOf("") }
     var error by remember { mutableStateOf(false) }
 
+    // Auto-close after 7s of inactivity so an elderly user who taps the admin
+    // icon by accident isn't left stuck on a password prompt. Any keystroke
+    // resets the timer (input is the key), so it only fires when nothing happens.
+    LaunchedEffect(input) {
+        kotlinx.coroutines.delay(7_000)
+        onDismiss()
+    }
+
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Admin Access", fontSize = 22.sp) },

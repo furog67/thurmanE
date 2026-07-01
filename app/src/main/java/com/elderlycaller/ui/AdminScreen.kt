@@ -140,27 +140,28 @@ fun AdminScreen(
                 color = Color.White,
                 modifier = Modifier.align(Alignment.Center)
             )
-            Row(
-                modifier = Modifier.align(Alignment.CenterEnd),
-                verticalAlignment = Alignment.CenterVertically
+            IconButton(
+                onClick = { showChangePassword = true },
+                modifier = Modifier.align(Alignment.CenterEnd)
             ) {
-                // Add tile lives at the top so the phone's on-screen nav buttons
-                // at the bottom can't cover it.
-                Row(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .clickable { showAddDialog = true }
-                        .padding(horizontal = 8.dp, vertical = 4.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Add Contact", tint = Color.White)
-                    Spacer(Modifier.width(4.dp))
-                    Text("Add", color = Color.White, fontSize = 15.sp, fontWeight = FontWeight.Bold)
-                }
-                IconButton(onClick = { showChangePassword = true }) {
-                    Icon(Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White)
-                }
+                Icon(Icons.Default.Lock, contentDescription = "Change Password", tint = Color.White)
             }
+        }
+
+        // Add Contact — directly under the header so it never overlaps the title
+        // and is clear of the phone's bottom navigation buttons.
+        Button(
+            onClick = { showAddDialog = true },
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 16.dp, vertical = 8.dp)
+                .height(52.dp),
+            shape = RoundedCornerShape(12.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0))
+        ) {
+            Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(24.dp))
+            Spacer(Modifier.width(8.dp))
+            Text("Add New Contact Tile", fontSize = 16.sp, fontWeight = FontWeight.Bold)
         }
 
         Text(
