@@ -11,6 +11,7 @@ import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.telecom.TelecomManager
+import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -325,6 +326,7 @@ fun AdminScreen(
 
 @Composable
 private fun DebugLogCard() {
+    val context = LocalContext.current
     var logText by remember { mutableStateOf(com.elderlycaller.DebugLog.read()) }
     Card(
         modifier = Modifier
@@ -364,6 +366,43 @@ private fun DebugLogCard() {
                     fontSize = 11.sp,
                     fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
                 )
+            }
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 8.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Button(
+                    onClick = {
+                        val text = com.elderlycaller.DebugLog.read().trim()
+                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
+                                as android.content.ClipboardManager
+                        clipboard.setPrimaryClip(
+                            android.content.ClipData.newPlainText("Easy Caller Log", text)
+                        )
+                        Toast.makeText(context, "Log copied to clipboard", Toast.LENGTH_SHORT).show()
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1565C0)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Copy", fontSize = 14.sp) }
+                Button(
+                    onClick = {
+                        // Kiosk pinning blocks launching the share sheet — unpin first.
+                        (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
+                        val text = com.elderlycaller.DebugLog.read().trim()
+                        val send = Intent(Intent.ACTION_SEND).apply {
+                            type = "text/plain"
+                            putExtra(Intent.EXTRA_SUBJECT, "Easy Caller Diagnostic Log")
+                            putExtra(Intent.EXTRA_TEXT, text)
+                        }
+                        context.startActivity(Intent.createChooser(send, "Share log"))
+                    },
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF2E7D32)),
+                    shape = RoundedCornerShape(8.dp)
+                ) { Text("Share", fontSize = 14.sp) }
             }
         }
     }
