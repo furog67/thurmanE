@@ -78,13 +78,14 @@ object CallManager {
     }
 
     // Times how long our process survives after placing the call. If the process
-    // is being hard-killed we simply stop seeing these lines.
+    // is being hard-killed we simply stop seeing these lines. Sub-second ticks at
+    // first because the process has been dying in under a second.
     private suspend fun heartbeat() {
-        var elapsed = 0
-        while (elapsed < 10) {
-            delay(1_000)
-            elapsed++
-            DebugLog.log("heartbeat +${elapsed}s bound=${EasyCallerInCallService.activeService != null} callActive=${callActive.value}")
+        var ms = 0
+        while (ms < 12_000) {
+            delay(250)
+            ms += 250
+            DebugLog.log("heartbeat +${ms}ms bound=${EasyCallerInCallService.activeService != null} callActive=${callActive.value}")
         }
     }
 

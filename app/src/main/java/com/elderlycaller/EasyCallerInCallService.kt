@@ -46,14 +46,19 @@ class EasyCallerInCallService : InCallService() {
     }
 
     override fun onCallAdded(call: Call) {
-        // Reset to STATE_NEW before processing so that collectors never see a
-        // stale STATE_DISCONNECTED left over from a prior call.
-        _callState.value = Call.STATE_NEW
-        activeCall = call
-        call.registerCallback(callStateCallback)
-        DebugLog.log("InCallSvc.onCallAdded state=${call.details.state}")
-        CallManager.debug.value = "onCallAdded state=${call.details.state}"
-        _callState.value = call.details.state
+        DebugLog.log("InCallSvc.onCallAdded ENTER")
+        try {
+            // Reset to STATE_NEW before processing so that collectors never see a
+            // stale STATE_DISCONNECTED left over from a prior call.
+            _callState.value = Call.STATE_NEW
+            activeCall = call
+            call.registerCallback(callStateCallback)
+            DebugLog.log("InCallSvc.onCallAdded state=${call.details.state}")
+            CallManager.debug.value = "onCallAdded state=${call.details.state}"
+            _callState.value = call.details.state
+        } catch (t: Throwable) {
+            DebugLog.log("onCallAdded THREW ${t.javaClass.simpleName}: ${t.message}")
+        }
     }
 
     override fun onCallRemoved(call: Call) {

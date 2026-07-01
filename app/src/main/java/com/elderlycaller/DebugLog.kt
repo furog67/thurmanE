@@ -30,7 +30,11 @@ object DebugLog {
         val t = SystemClock.elapsedRealtime() / 1000
         val line = "[$t] $event"
         val updated = ((p.getString(KEY, "") ?: "") + "\n" + line).takeLast(MAX_CHARS)
-        p.edit().putString(KEY, updated).apply()
+        // commit() (synchronous) not apply() — the process may be killed milliseconds
+        // after a log call, and apply()'s async disk write would lose the last events.
+        p.edit().putString(KEY, updated).commit()
+        // Mirror to Logcat (tag EASYCALLER) so it's visible in Android Studio too.
+        android.util.Log.i("EASYCALLER", event)
     }
 
     fun read(): String = prefs?.getString(KEY, "") ?: ""
