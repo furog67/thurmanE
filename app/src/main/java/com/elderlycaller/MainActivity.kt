@@ -1,7 +1,6 @@
 package com.elderlycaller
 
 import android.Manifest
-import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -12,12 +11,21 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.core.content.ContextCompat
 import com.elderlycaller.data.Tile
 import com.elderlycaller.ui.AdminPasswordDialog
@@ -38,9 +46,8 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
-        // CallManager is a process-scoped singleton — initialise once with the
-        // application context so it survives any activity recreation Telecom
-        // triggers when it brings the default dialer's UI to the front.
+        // Process-lifetime call controller. Survives this activity being recreated
+        // by Telecom mid-call, so the call screen restores instead of vanishing.
         CallManager.init(this)
 
         setShowWhenLocked(true)
@@ -54,12 +61,12 @@ class MainActivity : ComponentActivity() {
         }
 
         onBackPressedDispatcher.addCallback(this) {
+            // Swallow back while a call is active so the user must tap HANG UP.
             if (!CallManager.callActive.value) {
                 isEnabled = false
                 onBackPressedDispatcher.onBackPressed()
                 isEnabled = true
             }
-            // swallow back during an active call — user must tap HANG UP
         }
 
         setContent {
@@ -74,14 +81,6 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    // Telecom fires an intent at the default dialer's main activity to bring
-    // the call UI to the front (even when it was the dialer that placed the
-    // call). Because CallManager is a singleton the call state is already
-    // preserved — no extra work needed here beyond the default behaviour.
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-    }
-
     override fun onResume() {
         super.onResume()
         KioskMode.pin(this)
@@ -94,57 +93,81 @@ private fun App(viewModel: MainViewModel) {
     val activity = LocalContext.current as? android.app.Activity
 
     var showPasswordDialog by remember { mutableStateOf(false) }
-    var inAdmin            by remember { mutableStateOf(false) }
-    var preCallTile        by remember { mutableStateOf<Tile?>(null) }
+    var inAdmin by remember { mutableStateOf(false) }
+    var preCallTile by remember { mutableStateOf<Tile?>(null) }
 
-    // Keep screen on while a call is active; release when done.
-    LaunchedEffect(CallManager.callActive.value) {
-        if (CallManager.callActive.value) {
+    // Call state is the source of truth in CallManager (a singleton), NOT local
+    // remember state — so if Telecom recreates this activity mid-call, the call
+    // screen comes right back instead of falling through to the tile grid.
+    val callActive = CallManager.callActive.value
+    val activeTile = CallManager.activeTile
+
+    LaunchedEffect(callActive) {
+        if (callActive) {
             activity?.window?.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         } else {
             activity?.window?.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
-    when {
-        CallManager.callActive.value && CallManager.activeTile != null -> CallingScreen(
-            tile      = CallManager.activeTile!!,
-            status    = CallManager.callStatus.value,
-            speakerOn = CallManager.speakerOn.value,
-            onHangUp  = { CallManager.endCall() }
-        )
-        preCallTile != null -> PreCallScreen(
-            tile   = preCallTile!!,
-            onBack = { preCallTile = null },
-            onCall = { tile ->
-                preCallTile = null
-                CallManager.startCall(tile)
-            }
-        )
-        inAdmin -> AdminScreen(
-            tiles          = tiles,
-            onAddTile      = viewModel::addTile,
-            onUpdateTile   = viewModel::updateTile,
-            onDeleteTile   = viewModel::deleteTile,
-            onChangePassword = viewModel::changePassword,
-            onExit         = { inAdmin = false }
-        )
-        else -> {
-            MainScreen(
-                tiles       = tiles,
-                onTileClick = { preCallTile = it },
-                onAdminClick = { showPasswordDialog = true }
+    Box(modifier = Modifier.fillMaxSize()) {
+        when {
+            callActive && activeTile != null -> CallingScreen(
+                tile = activeTile,
+                status = CallManager.callStatus.value,
+                speakerOn = CallManager.speakerOn.value,
+                onHangUp = { CallManager.endCall() }
             )
-            if (showPasswordDialog) {
-                AdminPasswordDialog(
-                    checkPassword = viewModel::checkPassword,
-                    onSuccess = {
-                        showPasswordDialog = false
-                        inAdmin = true
-                    },
-                    onDismiss = { showPasswordDialog = false }
+            preCallTile != null -> PreCallScreen(
+                tile = preCallTile!!,
+                onBack = { preCallTile = null },
+                onCall = { tile ->
+                    CallManager.startCall(tile)
+                    preCallTile = null
+                }
+            )
+            inAdmin -> AdminScreen(
+                tiles = tiles,
+                onAddTile = viewModel::addTile,
+                onUpdateTile = viewModel::updateTile,
+                onDeleteTile = viewModel::deleteTile,
+                onChangePassword = viewModel::changePassword,
+                onExit = { inAdmin = false }
+            )
+            else -> {
+                MainScreen(
+                    tiles = tiles,
+                    onTileClick = { preCallTile = it },
+                    onAdminClick = { showPasswordDialog = true }
                 )
+                if (showPasswordDialog) {
+                    AdminPasswordDialog(
+                        checkPassword = viewModel::checkPassword,
+                        onSuccess = {
+                            showPasswordDialog = false
+                            inAdmin = true
+                        },
+                        onDismiss = { showPasswordDialog = false }
+                    )
+                }
             }
+        }
+
+        // TEMP debug banner — persists across the "flash" so the last call
+        // attempt's outcome is readable even after returning to the grid.
+        val debug = CallManager.debug.value
+        if (debug.isNotEmpty()) {
+            Text(
+                text = debug,
+                color = Color(0xFFFFEB3B),
+                fontSize = 13.sp,
+                textAlign = TextAlign.Center,
+                modifier = Modifier
+                    .align(Alignment.BottomCenter)
+                    .fillMaxWidth()
+                    .background(Color(0xCC000000))
+                    .padding(6.dp)
+            )
         }
     }
 }

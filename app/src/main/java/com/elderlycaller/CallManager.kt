@@ -39,6 +39,10 @@ object CallManager {
     val callActive = mutableStateOf(false)
     val callStatus = mutableStateOf("Calling…")
     val speakerOn  = mutableStateOf(false)
+    // Diagnostic line shown small on the call screen: tells us whether our
+    // InCallService actually bound (i.e. whether Easy Caller — not the system
+    // dialer — is handling the call) and the last raw Telecom state seen.
+    val debug      = mutableStateOf("")
 
     // Which tile is being called — persists across activity recreations.
     var activeTile: Tile? = null
@@ -86,7 +90,8 @@ object CallManager {
 
     private suspend fun placeCall(phone: String) {
         val uri = android.net.Uri.fromParts("tel", phone, null)
-        runCatching { telecomManager.placeCall(uri, Bundle()) }
+        val placed = runCatching { telecomManager.placeCall(uri, Bundle()) }
+        updateDebug("placeCall ok=${placed.isSuccess}")
 
         delay(2_000)
         if (!callEnded) enableSpeaker()
@@ -95,8 +100,14 @@ object CallManager {
         if (!callStarted && !callEnded) endCall()
     }
 
+    private fun updateDebug(note: String) {
+        val bound = EasyCallerInCallService.activeService != null
+        debug.value = "$note | inCallSvc=${if (bound) "BOUND" else "not bound"}"
+    }
+
     private suspend fun collectCallState() {
         EasyCallerInCallService.callState.collect { state ->
+            updateDebug("state=$state")
             when (state) {
                 Call.STATE_CONNECTING,
                 Call.STATE_DIALING,

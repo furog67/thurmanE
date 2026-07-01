@@ -28,6 +28,7 @@ class EasyCallerInCallService : InCallService() {
     override fun onCreate() {
         super.onCreate()
         activeService = this
+        CallManager.debug.value = "InCallSvc CREATED (bound OK)"
     }
 
     override fun onDestroy() {
@@ -47,6 +48,7 @@ class EasyCallerInCallService : InCallService() {
         _callState.value = Call.STATE_NEW
         activeCall = call
         call.registerCallback(callStateCallback)
+        CallManager.debug.value = "onCallAdded state=${call.details.state}"
         _callState.value = call.details.state
     }
 
