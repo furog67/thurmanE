@@ -269,24 +269,54 @@ fun AdminScreen(
             colors = CardDefaults.cardColors(containerColor = Color(0xFFE3F2FD)),
             shape = RoundedCornerShape(12.dp)
         ) {
-            Row(
-                modifier = Modifier.padding(12.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = "The app is locked to the screen so the user can't reach Home or Settings.",
-                    fontSize = 14.sp,
-                    color = Color(0xFF0D47A1),
-                    modifier = Modifier.weight(1f)
-                )
-                Spacer(Modifier.width(8.dp))
-                Button(
-                    onClick = {
-                        (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
-                    },
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)),
-                    shape = RoundedCornerShape(8.dp)
-                ) { Text("Unlock Navigation", fontSize = 14.sp) }
+            Column(modifier = Modifier.padding(12.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "The app is locked to the screen so the user can't reach Home or Settings.",
+                        fontSize = 14.sp,
+                        color = Color(0xFF0D47A1),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    Button(
+                        onClick = {
+                            (context as? android.app.Activity)?.let { com.elderlycaller.KioskMode.unpin(it) }
+                        },
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF0D47A1)),
+                        shape = RoundedCornerShape(8.dp)
+                    ) { Text("Unlock Navigation", fontSize = 14.sp) }
+                }
+
+                // TEMP debug: disable screen pinning entirely so we can test whether
+                // kiosk lock task is what blocks Easy Caller's in-call UI.
+                var kioskDisabled by remember {
+                    mutableStateOf(com.elderlycaller.KioskMode.isDisabled(context))
+                }
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 8.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Disable screen pinning (debug)",
+                        fontSize = 14.sp,
+                        color = Color(0xFF0D47A1),
+                        modifier = Modifier.weight(1f)
+                    )
+                    Switch(
+                        checked = kioskDisabled,
+                        onCheckedChange = {
+                            kioskDisabled = it
+                            com.elderlycaller.KioskMode.setDisabled(context, it)
+                            if (it) {
+                                (context as? android.app.Activity)?.let { a ->
+                                    com.elderlycaller.KioskMode.unpin(a)
+                                }
+                            }
+                        }
+                    )
+                }
             }
         }
 
