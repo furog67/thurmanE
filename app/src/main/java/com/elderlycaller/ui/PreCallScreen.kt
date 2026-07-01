@@ -25,6 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import coil.compose.AsyncImage
 import com.elderlycaller.CallingActivity
+import com.elderlycaller.KioskMode
 import com.elderlycaller.data.Tile
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -61,10 +62,11 @@ fun PreCallScreen(tile: Tile, onBack: () -> Unit) {
                     .border(6.dp, Color(0xFF80CBC4), CircleShape)
                     .clickable {
                         if (callPermissions.allPermissionsGranted) {
-                            // CallingActivity is singleInstance (its own isolated task)
-                            // so Telecom's singleTask re-launch of MainActivity can never
-                            // clear it off the stack. Return to the tile grid immediately
-                            // so there is no PreCallScreen lingering behind the call UI.
+                            // Lock task mode blocks launching a new task — unpin first so
+                            // CallingActivity (singleInstance = own isolated task) can
+                            // appear. MainActivity.onResume() re-pins when the tile grid
+                            // returns after the call ends.
+                            (context as? android.app.Activity)?.let { KioskMode.unpin(it) }
                             context.startActivity(
                                 Intent(context, CallingActivity::class.java).apply {
                                     putExtra(CallingActivity.EXTRA_PHONE, tile.phoneNumber)
