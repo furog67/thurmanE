@@ -19,6 +19,8 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -154,6 +156,10 @@ fun AdminScreen(
                 .background(Color(0xFFE0E0E0))
                 .padding(horizontal = 16.dp, vertical = 4.dp)
         )
+
+        // TEMP diagnostic log — persists across app close / process death so we can
+        // read what happened during a call attempt. Remove once the call flow works.
+        DebugLogCard()
 
         // Default dialer management
         val telecomManager = context.getSystemService(TelecomManager::class.java)
@@ -313,6 +319,52 @@ fun AdminScreen(
             Icon(Icons.Default.Add, contentDescription = null, modifier = Modifier.size(28.dp))
             Spacer(Modifier.width(8.dp))
             Text("Add New Contact Tile", fontSize = 18.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+@Composable
+private fun DebugLogCard() {
+    var logText by remember { mutableStateOf(com.elderlycaller.DebugLog.read()) }
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFF212121)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    text = "Diagnostic Log",
+                    color = Color(0xFFFFEB3B),
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 14.sp,
+                    modifier = Modifier.weight(1f)
+                )
+                TextButton(onClick = { logText = com.elderlycaller.DebugLog.read() }) {
+                    Text("Refresh", color = Color(0xFF90CAF9), fontSize = 13.sp)
+                }
+                TextButton(onClick = {
+                    com.elderlycaller.DebugLog.clear()
+                    logText = ""
+                }) {
+                    Text("Clear", color = Color(0xFFEF9A9A), fontSize = 13.sp)
+                }
+            }
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(160.dp)
+                    .verticalScroll(rememberScrollState())
+            ) {
+                Text(
+                    text = if (logText.isBlank()) "(empty — make a call, then reopen Admin and tap Refresh)" else logText.trim(),
+                    color = Color(0xFFB2FF59),
+                    fontSize = 11.sp,
+                    fontFamily = androidx.compose.ui.text.font.FontFamily.Monospace
+                )
+            }
         }
     }
 }

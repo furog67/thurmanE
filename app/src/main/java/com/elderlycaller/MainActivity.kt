@@ -46,6 +46,9 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
 
+        DebugLog.init(this)
+        DebugLog.log("MainActivity.onCreate savedState=${savedInstanceState != null} callActive=${CallManager.callActive.value}")
+
         // Process-lifetime call controller. Survives this activity being recreated
         // by Telecom mid-call, so the call screen restores instead of vanishing.
         CallManager.init(this)
@@ -83,7 +86,23 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        DebugLog.log("MainActivity.onResume callActive=${CallManager.callActive.value}")
         KioskMode.pin(this)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        DebugLog.log("MainActivity.onPause callActive=${CallManager.callActive.value}")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        DebugLog.log("MainActivity.onStop finishing=$isFinishing callActive=${CallManager.callActive.value}")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+        DebugLog.log("MainActivity.onDestroy finishing=$isFinishing")
     }
 }
 

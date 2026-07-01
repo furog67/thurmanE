@@ -57,6 +57,7 @@ object CallManager {
     }
 
     fun startCall(tile: Tile) {
+        DebugLog.log("CallManager.startCall ${tile.phoneNumber} defaultDialer=${isDefaultDialer()}")
         callJob?.cancel()
         activeTile     = tile
         callEnded      = false
@@ -88,9 +89,14 @@ object CallManager {
         callJob = null
     }
 
+    private fun isDefaultDialer(): Boolean =
+        runCatching { telecomManager.defaultDialerPackage == appContext?.packageName }
+            .getOrDefault(false)
+
     private suspend fun placeCall(phone: String) {
         val uri = android.net.Uri.fromParts("tel", phone, null)
         val placed = runCatching { telecomManager.placeCall(uri, Bundle()) }
+        DebugLog.log("placeCall ok=${placed.isSuccess} err=${placed.exceptionOrNull()?.javaClass?.simpleName ?: "-"}")
         updateDebug("placeCall ok=${placed.isSuccess}")
 
         delay(2_000)
@@ -107,6 +113,7 @@ object CallManager {
 
     private suspend fun collectCallState() {
         EasyCallerInCallService.callState.collect { state ->
+            DebugLog.log("callState=$state bound=${EasyCallerInCallService.activeService != null}")
             updateDebug("state=$state")
             when (state) {
                 Call.STATE_CONNECTING,
