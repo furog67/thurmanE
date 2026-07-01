@@ -111,6 +111,13 @@ class CallingActivity : ComponentActivity() {
             // else swallow — user must tap HANG UP
         }
 
+        // Telecom's call-setup on Android 10+ fires an intent to surface the
+        // default dialer's MainActivity (singleTask), which would clear
+        // CallingActivity off the stack mid-call. Unpinning here prevents the
+        // lock-task/singleTask conflict; MainActivity.onResume() re-pins the
+        // moment the call screen closes and the user returns to the tile grid.
+        KioskMode.unpin(this)
+
         registerCallListener()
         placeCall(phone)
         watchSpeakerState()
